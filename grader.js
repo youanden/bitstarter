@@ -24,6 +24,8 @@ References:
 var fs = require('fs');
 var program = require('commander');
 var cheerio = require('cheerio');
+var restler = require('restler');
+var URL_DEFAULT = "http://floating-lake-4809.herokuapp.com/";
 var HTMLFILE_DEFAULT = "index.html";
 var CHECKSFILE_DEFAULT = "checks.json";
 
@@ -34,6 +36,19 @@ var assertFileExists = function(infile) {
         process.exit(1); // http://nodejs.org/api/process.html#process_process_exit_code
     }
     return instr;
+};
+
+var getFileFromUrl = function(url, getRemoteResult) {
+    var file = "index_remote.html";
+    if( getRemoteResult ) {
+        restler.get(url).on('complete', function(data) {
+          fs.writeFileSync(file, data);
+          assertFileExists(file);
+          getRemoteResult(file);
+        });
+    } else {
+        return url;
+    }
 };
 
 var cheerioHtmlFile = function(htmlfile) {
@@ -61,14 +76,35 @@ var clone = function(fn) {
     return fn.bind({});
 };
 
+var printResult = function(check_handler) {
+    var checkJson = check_handler();
+    var outJson = JSON.stringify(checkJson, null, 4);
+    console.log(outJson);
+};
+
+var arrContains = function(arr, str) {
+    return arr.indexOf(str) > -1;
+};
+
 if(require.main == module) {
+    var args = process.argv;
     program
         .option('-c, --checks <check_file>', 'Path to checks.json', clone(assertFileExists), CHECKSFILE_DEFAULT)
         .option('-f, --file <html_file>', 'Path to index.html', clone(assertFileExists), HTMLFILE_DEFAULT)
-        .parse(process.argv);
-    var checkJson = checkHtmlFile(program.file, program.checks);
-    var outJson = JSON.stringify(checkJson, null, 4);
-    console.log(outJson);
+        .option('-u, --url <url_path>', 'HTTP URI to index.html', clone(getFileFromUrl), URL_DEFAULT)
+        .parse(args);
+
+    if(arrContains(args, "--url") || arrContains(args, "-u")) {
+        getFileFromUrl(program.url, function(remote_file) {
+            printResult(function() {
+                return checkHtmlFile(remote_file, program.checks);
+            });
+        });
+    } else {
+        printResult(function() {
+            return checkHtmlFile(program.file, program.checks);
+        });
+    }
 } else {
     exports.checkHtmlFile = checkHtmlFile;
 }
