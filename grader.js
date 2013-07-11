@@ -99,6 +99,7 @@ if(require.main == module) {
             printResult(function() {
                 return checkHtmlFile(remote_file, program.checks);
             });
+            fs.unlinkSync(remote_file);
         });
     } else {
         printResult(function() {
